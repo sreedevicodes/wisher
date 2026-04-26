@@ -177,7 +177,6 @@ export default function App() {
 // ---------------------- LANDING / ONBOARDING ----------------------
 const LandingScreen = ({ users, onLogin }) => {
   const [view, setView] = useState('landing');
-  const [targetUser, setTargetUser] = useState(null);
 
   if (view === 'create') {
     return (
@@ -191,32 +190,12 @@ const LandingScreen = ({ users, onLogin }) => {
     );
   }
 
-  if (view === 'login-select') {
-    return (
-      <div style={{minHeight: '100vh', padding: '4rem 1rem'}}>
-        <button onClick={() => setView('landing')} className="pill-btn pill-btn-outline" style={{marginBottom: '2rem', marginLeft: 'auto', marginRight: 'auto', display: 'block'}}><ArrowLeft size={16}/> Back</button>
-        <h1 className="editorial-header" style={{marginTop: 0}}>Pick your profile</h1>
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1.5rem', maxWidth: '800px', margin: '0 auto'}}>
-           {users.map(u => (
-             <div key={u.username} onClick={() => { setTargetUser(u); setView('login-pin'); }} className="user-card" style={{borderColor: u.accentColor}}>
-               <div style={{fontSize: '3.5rem', marginBottom: '1rem', background: '#f9f9f9', width: 90, height: 90, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>{u.avatar}</div>
-               <h2 style={{fontSize: '1.25rem', fontWeight: 800, margin: 0}}>{u.name}</h2>
-             </div>
-           ))}
-           {users.length === 0 && (
-             <div style={{gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#888', fontWeight: 600, fontSize: '1.25rem'}}>No profiles exist yet. Please create one!</div>
-           )}
-        </div>
-      </div>
-    );
-  }
-
-  if (view === 'login-pin') {
+  if (view === 'login') {
     return (
       <div style={{minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'}}>
         <div className="settings-card" style={{maxWidth: '440px', width: '100%', position: 'relative'}}>
-          <button onClick={() => setView('login-select')} style={{position: 'absolute', top: '1.5rem', left: '1.5rem', background: '#f5f5f5', width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}><ArrowLeft size={20}/></button>
-          <PinAuth targetPin={targetUser.pin} title={`Welcome back, ${targetUser.name}`} subtitle="Enter your 4-digit PIN" onSuccess={() => onLogin(targetUser)} />
+          <button onClick={() => setView('landing')} style={{position: 'absolute', top: '1.5rem', left: '1.5rem', background: '#f5f5f5', width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10}}><ArrowLeft size={20}/></button>
+          <UsernamePinAuth users={users} onVerified={onLogin} title="Log In" />
         </div>
       </div>
     );
@@ -228,7 +207,7 @@ const LandingScreen = ({ users, onLogin }) => {
       <p style={{fontSize: '1.25rem', color: '#666', fontWeight: 600, marginTop: '1rem', marginBottom: '4rem'}}>your little corner for everything you want 🎁</p>
       <div style={{display: 'flex', gap: '1rem', flexDirection: 'column', width: '100%', maxWidth: '280px'}}>
         <button onClick={() => setView('create')} className="pill-btn pill-btn-filled" style={{justifyContent: 'center', padding: '1.25rem', fontSize: '1.25rem', '--btn-color': '#111'}}>Create Profile</button>
-        <button onClick={() => setView('login-select')} className="pill-btn pill-btn-outline" style={{justifyContent: 'center', padding: '1.25rem', fontSize: '1.25rem'}}>Log In</button>
+        <button onClick={() => setView('login')} className="pill-btn pill-btn-outline" style={{justifyContent: 'center', padding: '1.25rem', fontSize: '1.25rem'}}>Log In</button>
       </div>
     </div>
   );
@@ -456,6 +435,54 @@ const SettingsTab = ({ users, currentUser, onLogout }) => {
 }
 
 // ---------------------- COMPONENTS ----------------------
+const UsernamePinAuth = ({ users, onVerified, title = "Verify Identity" }) => {
+  const [usernameInput, setUsernameInput] = useState('');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState(false);
+
+  const handleNum = (n) => {
+    if (pin.length < 4) setPin(pin + n);
+  };
+
+  const handleConfirm = () => {
+    if (pin.length !== 4 || !usernameInput.trim()) return;
+    const targetUsers = users.filter(u => u.username.toLowerCase() === usernameInput.trim().toLowerCase() || u.name.toLowerCase() === usernameInput.trim().toLowerCase());
+    const matchedUser = targetUsers.find(u => u.pin === hashPin(pin));
+    
+    if (matchedUser) {
+      onVerified(matchedUser);
+    } else {
+      setError(true);
+      setTimeout(() => { setPin(''); setError(false); }, 400);
+    }
+  };
+
+  return (
+    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '1rem'}}>
+      <h2 style={{fontSize: '2rem', fontWeight: 800, marginBottom: '2rem', textAlign: 'center'}}>{title}</h2>
+      <input 
+        className="input-field" 
+        placeholder="Enter your name" 
+        value={usernameInput} 
+        onChange={e => setUsernameInput(e.target.value)} 
+        style={{marginBottom: '2rem', textAlign: 'center'}}
+      />
+      <div className={`shake ${error ? 'shake' : ''}`} style={{display: 'flex', gap: '1.5rem', justifyContent: 'center', marginBottom: '2.5rem'}}>
+        {[...Array(4)].map((_, i) => <div key={i} className={`numpad-dot ${i < pin.length ? 'filled' : ''}`} />)}
+      </div>
+      <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', maxWidth: '320px', margin: '0 auto 2.5rem auto'}}>
+        {[1,2,3,4,5,6,7,8,9].map(n => <button key={n} className="num-key" onClick={() => handleNum(n.toString())}>{n}</button>)}
+        <div></div>
+        <button className="num-key" onClick={() => handleNum('0')}>0</button>
+        <button className="num-key" onClick={() => setPin(pin.slice(0, -1))} style={{fontSize: '1.5rem', background: 'transparent', border: 'none', boxShadow: 'none'}}>⌫</button>
+      </div>
+      <button onClick={handleConfirm} className="pill-btn pill-btn-filled" style={{'--btn-color': '#111', width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1.25rem'}} disabled={pin.length !== 4 || !usernameInput.trim()}>
+        Log In
+      </button>
+    </div>
+  );
+}
+
 const PinAuth = ({ targetPin, title, subtitle, onSuccess }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
