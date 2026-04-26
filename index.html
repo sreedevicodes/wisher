@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wishr</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root { --bg: #fdf8f2; --text: #4a4a4a; --shadow: rgba(0,0,0,0.06); }
+      body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Nunito', sans-serif; -webkit-font-smoothing: antialiased; }
+      button { font-family: inherit; cursor: pointer; border: none; background: none; }
+      input, select, textarea { font-family: inherit; }
+      a { color: inherit; text-decoration: none; }
+      
+      h1, h2, h3 { margin: 0; font-weight: 800; }
+      p { margin: 0; }
+      
+      .app { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem; }
+      
+      .flex { display: flex; }
+      .items-center { align-items: center; }
+      .justify-between { justify-content: space-between; }
+      .gap-2 { gap: 0.5rem; } .gap-4 { gap: 1rem; }
+      .grid { display: grid; }
+      .grid-cols-2 { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+      .text-center { text-align: center; }
+      .relative { position: relative; }
+      .w-full { width: 100%; }
+      .mx-auto { margin-left: auto; margin-right: auto; }
+      .mt-4 { margin-top: 1rem; }
+      
+      .card { background: #fff; border-radius: 24px; padding: 1.5rem; box-shadow: 0 8px 24px var(--shadow); transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
+      .card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.1); }
+      .avatar { font-size: 3rem; background: var(--user-color, #eee); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -4px 0 rgba(0,0,0,0.08); }
+      
+      .modal-overlay { position: fixed; inset: 0; background: rgba(253, 248, 242, 0.85); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem; overflow-y: auto; }
+      .modal { background: #fff; border-radius: 32px; padding: 2rem; width: 100%; max-width: 440px; box-shadow: 0 20px 40px rgba(0,0,0,0.12); position: relative; margin: auto; }
+      .close-btn { position: absolute; top: 1.5rem; right: 1.5rem; background: #f0f0f0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+      .close-btn:hover { background: #e0e0e0; }
+      
+      .pin-dots { display: flex; gap: 1rem; justify-content: center; margin: 2rem 0; }
+      .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #ccc; transition: all 0.2s; }
+      .dot.filled { background: var(--text); border-color: var(--text); }
+      .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+      @keyframes shake { 10%, 90% { transform: translate3d(-2px, 0, 0); } 20%, 80% { transform: translate3d(4px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-6px, 0, 0); } 40%, 60% { transform: translate3d(6px, 0, 0); } }
+      .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; max-width: 260px; margin: 0 auto; }
+      .num-key { width: 70px; height: 70px; border-radius: 50%; font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; justify-content: center; background: #f5f5f5; margin: 0 auto; transition: background 0.2s, transform 0.1s; color: var(--text); }
+      .num-key:hover { background: #e0e0e0; }
+      .num-key:active { background: #d0d0d0; transform: scale(0.95); }
+      
+      .input-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; }
+      .input-group label { font-weight: 700; font-size: 0.95rem; }
+      .input, .select, .textarea { padding: 0.8rem 1rem; border-radius: 16px; border: 2px solid #eee; background: #f9f9f9; font-size: 1rem; outline: none; transition: border-color 0.2s, background 0.2s; }
+      .input:focus, .select:focus, .textarea:focus { border-color: var(--user-color, #ccc); background: #fff; }
+      .btn-primary { background: var(--user-color, #4a4a4a); color: #fff; padding: 1rem; border-radius: 16px; font-weight: 700; font-size: 1.1rem; width: 100%; transition: opacity 0.2s, transform 0.2s; }
+      .btn-primary:hover:not(:disabled) { opacity: 0.9; transform: translateY(-2px); }
+      .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+      
+      .wish-item { background: #fff; border-radius: 20px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 4px 12px var(--shadow); display: flex; gap: 1rem; border-left: 8px solid var(--user-color, #eee); }
+      .wish-content { flex: 1; }
+      .wish-title { font-size: 1.25rem; font-weight: 800; margin-bottom: 0.25rem; word-break: break-word; }
+      .wish-meta { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; font-size: 0.8rem; font-weight: 700; }
+      .badge { padding: 0.35rem 0.75rem; border-radius: 12px; background: #f0f0f0; }
+      .wish-actions { display: flex; flex-direction: column; gap: 0.5rem; }
+      .icon-btn { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #f5f5f5; color: #666; transition: all 0.2s; }
+      .icon-btn:hover { background: #eee; color: #333; }
+      
+      .emoji-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; max-height: 200px; overflow-y: auto; padding: 0.5rem; background: #f9f9f9; border-radius: 16px; border: 2px solid #eee; }
+      .emoji-btn { font-size: 1.8rem; padding: 0.5rem; border-radius: 12px; border: 2px solid transparent; transition: all 0.2s; background: transparent; }
+      .emoji-btn:hover { background: #f0f0f0; }
+      .emoji-btn.selected { background: #fff; border-color: #ccc; transform: scale(1.1); box-shadow: 0 4px 8px var(--shadow); z-index: 10; position: relative; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/App.jsx"></script>
+  </body>
+</html>
