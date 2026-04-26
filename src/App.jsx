@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { db } from './firebase';
-import { collection, doc, setDoc, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, deleteDoc, updateDoc, getDocs } from 'firebase/firestore';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Search, Plus, X, LogOut, ArrowLeft, Edit2, Trash2, ExternalLink, GripVertical, Settings as SettingsIcon } from 'lucide-react';
+import { Search, Plus, X, LogOut, ArrowLeft, Edit2, Trash2, ExternalLink, GripVertical } from 'lucide-react';
 
 const EMOJIS = ['🦊', '🐰', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🦉', '🦄', '🐝', '🐛', '🦋', '🐌', '🐙'];
 const COLORS = ['#e8a4a4', '#a4c4a4', '#a4c4e8', '#c4a4e8', '#e8c4a4', '#e8e4a4', '#e8b4a0', '#a4e8d4'];
@@ -57,7 +57,6 @@ const GlobalStyles = () => (
     .modal-content { background: #fff; border-radius: 40px; padding: 3rem; width: 100%; max-width: 440px; box-shadow: 0 24px 48px rgba(0,0,0,0.1); position: relative; border: 2px solid rgba(0,0,0,0.05); margin: auto; }
     @media (max-width: 768px) { .modal-content { padding: 2rem; } }
     .settings-card { background: #fff; border-radius: 32px; padding: 2rem; box-shadow: 0 12px 32px rgba(0,0,0,0.05); border: 2px solid rgba(0,0,0,0.03); margin-bottom: 2rem; }
-    .settings-card h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 2rem; border-bottom: 2px solid #f0f0f0; padding-bottom: 1rem; margin-top: 0; }
   `}</style>
 );
 
@@ -67,7 +66,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
   const [viewedUser, setViewedUser] = useState(null);
-  const [pinModalConfig, setPinModalConfig] = useState(null);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'users'), (snap) => {
@@ -93,7 +91,6 @@ export default function App() {
   const handleLogin = (user) => {
     setCurrentUser(user);
     localStorage.setItem('wishr_session', JSON.stringify(user));
-    setPinModalConfig(null);
   };
 
   const handleLogout = () => {
@@ -121,20 +118,14 @@ export default function App() {
           {activeTab === 'home' && <HomeTab users={users.filter(u => u.username !== currentUser?.username)} setViewedUser={setViewedUser} counts={itemCounts} />}
           
           {activeTab === 'my-wishes' && (
-            <RequireAuth currentUser={currentUser} users={users} onSelectUser={u => setPinModalConfig({title: `Welcome back, ${u.name}`, subtitle: 'Enter PIN to login', targetPin: u.pin, onSuccess: () => handleLogin(u)})}>
-              <MyWishesTab currentUser={currentUser} />
-            </RequireAuth>
+             <MyWishesTab currentUser={currentUser} users={users} onLogin={handleLogin} />
           )}
 
           {activeTab === 'settings' && (
-            <RequireAuth currentUser={currentUser} users={users} onSelectUser={u => setPinModalConfig({title: `Welcome back, ${u.name}`, subtitle: 'Enter PIN to login', targetPin: u.pin, onSuccess: () => handleLogin(u)})}>
-              <SettingsTab currentUser={currentUser} users={users} onLogout={handleLogout} setPinModalConfig={setPinModalConfig} />
-            </RequireAuth>
+             <SettingsTab currentUser={currentUser} users={users} onLogin={handleLogin} onLogout={handleLogout} />
           )}
         </main>
       )}
-
-      {pinModalConfig && <PinModal {...pinModalConfig} onClose={() => setPinModalConfig(null)} />}
     </>
   );
 }
@@ -203,47 +194,6 @@ const Navbar = ({ activeTab, setActiveTab, users, setViewedUser, currentUser, on
   )
 }
 
-// ---------------------- REQUIRE AUTH INTERCEPTOR ----------------------
-const RequireAuth = ({ currentUser, users, onSelectUser, children }) => {
-  const [createMode, setCreateMode] = useState(false);
-
-  if (currentUser) return children;
-
-  if (createMode) {
-    return (
-      <div style={{maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem'}}>
-        <h1 className="editorial-header">New Profile</h1>
-        <div className="settings-card">
-          <CreateProfileForm users={users} onSuccess={(u) => { setCreateMode(false); onSelectUser(u); }} />
-          <button onClick={() => setCreateMode(false)} style={{marginTop: '1rem', width: '100%', padding: '1rem', fontWeight: 700, color: '#888'}}>Cancel</button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{padding: '4rem 2rem', textAlign: 'center'}}>
-      <h1 className="editorial-header" style={{marginTop: 0}}>Pick your profile</h1>
-      <p style={{fontSize: '1.25rem', color: '#666', marginBottom: '3rem', fontWeight: 500}}>Choose a profile below to continue.</p>
-      
-      <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '2rem', maxWidth: '900px', margin: '0 auto'}}>
-        {users.map(u => (
-          <div key={u.username} onClick={() => onSelectUser(u)} className="user-card" style={{borderColor: u.accentColor}}>
-            <div style={{fontSize: '3.5rem', marginBottom: '1rem', background: '#f9f9f9', width: 90, height: 90, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>{u.avatar}</div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 800, margin: 0}}>{u.name}</h2>
-          </div>
-        ))}
-        {users.length < 8 && (
-          <div onClick={() => setCreateMode(true)} className="user-card" style={{border: '4px dashed #ddd', background: 'transparent', boxShadow: 'none'}}>
-            <div style={{background: '#eee', width: 90, height: 90, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', color: '#888'}}><Plus size={32}/></div>
-            <h2 style={{fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#888'}}>New Profile</h2>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ---------------------- TABS ----------------------
 const HomeTab = ({ users, setViewedUser, counts }) => (
   <div style={{padding: '2rem'}}>
@@ -266,11 +216,12 @@ const HomeTab = ({ users, setViewedUser, counts }) => (
   </div>
 );
 
-const MyWishesTab = ({ currentUser }) => {
+const MyWishesTab = ({ currentUser, users, onLogin }) => {
   const [items, setItems] = useState([]);
   const [editingItem, setEditingItem] = useState(null);
 
   useEffect(() => {
+    if (!currentUser) return;
     const unsub = onSnapshot(collection(db, `wishlists/${currentUser.username}/items`), snap => {
       let list = [];
       snap.forEach(d => list.push({ id: d.id, ...d.data() }));
@@ -293,6 +244,16 @@ const MyWishesTab = ({ currentUser }) => {
       });
     }
   };
+
+  if (!currentUser) {
+    return (
+      <div style={{minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem'}}>
+        <div className="settings-card" style={{width: '100%', maxWidth: '440px', margin: '0 auto'}}>
+           <UsernamePinAuth users={users} onVerified={onLogin} title="Welcome Back" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem'}}>
@@ -326,45 +287,143 @@ const MyWishesTab = ({ currentUser }) => {
   );
 }
 
-const SettingsTab = ({ currentUser, users, setPinModalConfig, onLogout }) => {
-  return (
-    <div style={{maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem'}}>
-      <h1 className="editorial-header">Settings</h1>
-      
-      {users.length < 8 && (
+const SettingsTab = ({ users, currentUser, onLogout }) => {
+  const [view, setView] = useState('menu');
+  const [tempUser, setTempUser] = useState(null);
+
+  const goMenu = () => { setView('menu'); setTempUser(null); };
+
+  if (view === 'menu') {
+    return (
+      <div style={{maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem'}}>
+         <h1 className="editorial-header">Settings</h1>
+         <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+            <button onClick={() => setView('create')} className="pill-btn pill-btn-outline" style={{width: '100%', justifyContent: 'center', padding: '1.5rem', fontSize: '1.25rem'}}>Create Profile</button>
+            <button onClick={() => {
+              if (currentUser) { setTempUser(currentUser); setView('edit-form'); }
+              else setView('edit-auth');
+            }} className="pill-btn pill-btn-outline" style={{width: '100%', justifyContent: 'center', padding: '1.5rem', fontSize: '1.25rem'}}>Edit Profile</button>
+            <button onClick={() => {
+              if (currentUser) { setTempUser(currentUser); setView('delete-confirm'); }
+              else setView('delete-auth');
+            }} className="pill-btn pill-btn-outline" style={{width: '100%', justifyContent: 'center', padding: '1.5rem', fontSize: '1.25rem', borderColor: '#e53935', color: '#e53935'}}>Delete Profile</button>
+         </div>
+      </div>
+    );
+  }
+
+  if (view === 'create') {
+    return (
+      <div style={{maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem'}}>
+        <button onClick={goMenu} className="pill-btn pill-btn-outline" style={{marginBottom: '2rem'}}><ArrowLeft size={16}/> Back</button>
         <div className="settings-card">
-          <h2>Create New Profile</h2>
-          <CreateProfileForm users={users} onSuccess={() => alert("Profile created! Switch profiles on the Home screen.")} />
+          <h2 style={{fontSize: '1.5rem', fontWeight: 800, marginBottom: '2rem'}}>Create New Profile</h2>
+          <CreateProfileForm users={users} onSuccess={() => { alert('Profile created!'); goMenu(); }} />
         </div>
-      )}
-
-      <div className="settings-card">
-        <h2>Edit My Profile</h2>
-        <EditProfileForm currentUser={currentUser} setPinModalConfig={setPinModalConfig} />
       </div>
+    );
+  }
 
-      <div className="settings-card" style={{borderColor: '#ffebee', background: '#fffafa'}}>
-        <h2 style={{color: '#c62828'}}>Delete My Profile</h2>
-        <p style={{fontSize: '1.1rem', color: '#666', marginBottom: '2rem', fontWeight: 500}}>This will permanently delete your profile and all your wishes. This action cannot be undone.</p>
-        <button onClick={() => {
-          setPinModalConfig({
-            title: 'Delete Profile', subtitle: 'Enter PIN to confirm deletion', targetPin: currentUser.pin,
-            onSuccess: async () => {
-              const qs = await getDocs(collection(db, `wishlists/${currentUser.username}/items`));
-              qs.forEach(d => deleteDoc(d.ref));
-              await deleteDoc(doc(db, 'users', currentUser.username));
-              onLogout();
-            }
-          });
-        }} className="pill-btn pill-btn-filled" style={{'--btn-color': '#e53935'}}>
-          <Trash2 size={20} /> Delete Profile Forever
-        </button>
+  if (view === 'edit-auth' || view === 'delete-auth') {
+    return (
+      <div style={{maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem'}}>
+        <button onClick={goMenu} className="pill-btn pill-btn-outline" style={{marginBottom: '2rem'}}><ArrowLeft size={16}/> Back</button>
+        <div className="settings-card">
+          <UsernamePinAuth users={users} title="Verify Identity" onVerified={(u) => {
+            setTempUser(u);
+            if (view === 'edit-auth') setView('edit-form');
+            if (view === 'delete-auth') setView('delete-confirm');
+          }} />
+        </div>
       </div>
+    );
+  }
+
+  if (view === 'edit-form') {
+    return (
+      <div style={{maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem'}}>
+        <button onClick={goMenu} className="pill-btn pill-btn-outline" style={{marginBottom: '2rem'}}><ArrowLeft size={16}/> Back</button>
+        <div className="settings-card">
+          <h2 style={{fontSize: '1.5rem', fontWeight: 800, marginBottom: '2rem'}}>Edit Profile</h2>
+          <EditProfileForm targetUser={tempUser} onSuccess={() => { alert('Profile updated!'); goMenu(); }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'delete-confirm') {
+    return (
+      <div style={{maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem'}}>
+        <button onClick={goMenu} className="pill-btn pill-btn-outline" style={{marginBottom: '2rem'}}><ArrowLeft size={16}/> Back</button>
+        <div className="settings-card" style={{borderColor: '#ffebee', background: '#fffafa', textAlign: 'center'}}>
+          <h2 style={{color: '#c62828', fontSize: '1.5rem', fontWeight: 800, marginBottom: '1rem'}}>Delete Profile</h2>
+          <p style={{fontSize: '1.1rem', color: '#666', marginBottom: '2rem', fontWeight: 500}}>Are you sure you want to permanently delete {tempUser.name}'s profile and all wishes? This cannot be undone.</p>
+          <button onClick={async () => {
+            const qs = await getDocs(collection(db, `wishlists/${tempUser.username}/items`));
+            qs.forEach(d => deleteDoc(d.ref));
+            await deleteDoc(doc(db, 'users', tempUser.username));
+            if (currentUser && currentUser.username === tempUser.username) onLogout();
+            goMenu();
+          }} className="pill-btn pill-btn-filled" style={{'--btn-color': '#e53935', width: '100%', justifyContent: 'center'}}>
+            <Trash2 size={20} /> Yes, Delete Forever
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ---------------------- COMPONENTS ----------------------
+const UsernamePinAuth = ({ users, onVerified, title = "Verify Identity" }) => {
+  const [usernameInput, setUsernameInput] = useState('');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState(false);
+
+  const handleNum = (n) => {
+    if (pin.length < 4) setPin(pin + n);
+  };
+
+  const handleConfirm = () => {
+    if (pin.length !== 4 || !usernameInput.trim()) return;
+    const targetUsers = users.filter(u => u.username.toLowerCase() === usernameInput.trim().toLowerCase() || u.name.toLowerCase() === usernameInput.trim().toLowerCase());
+    const matchedUser = targetUsers.find(u => u.pin === hashPin(pin));
+    
+    if (matchedUser) {
+      onVerified(matchedUser);
+    } else {
+      setError(true);
+      setTimeout(() => { setPin(''); setError(false); }, 400);
+    }
+  };
+
+  return (
+    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+      <h2 style={{fontSize: '2rem', fontWeight: 800, marginBottom: '2rem', textAlign: 'center'}}>{title}</h2>
+      <input 
+        className="input-field" 
+        placeholder="Enter your name" 
+        value={usernameInput} 
+        onChange={e => setUsernameInput(e.target.value)} 
+        style={{marginBottom: '2rem', textAlign: 'center'}}
+      />
+      <div className={`shake ${error ? 'shake' : ''}`} style={{display: 'flex', gap: '1.5rem', justifyContent: 'center', marginBottom: '2.5rem'}}>
+        {[...Array(4)].map((_, i) => <div key={i} className={`numpad-dot ${i < pin.length ? 'filled' : ''}`} />)}
+      </div>
+      <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', maxWidth: '320px', margin: '0 auto 2.5rem auto'}}>
+        {[1,2,3,4,5,6,7,8,9].map(n => <button key={n} className="num-key" onClick={() => handleNum(n.toString())}>{n}</button>)}
+        <div></div>
+        <button className="num-key" onClick={() => handleNum('0')}>0</button>
+        <button className="num-key" onClick={() => setPin(pin.slice(0, -1))} style={{fontSize: '1rem', background: 'transparent', border: 'none', boxShadow: 'none'}}>⌫</button>
+      </div>
+      <button onClick={handleConfirm} className="pill-btn pill-btn-filled" style={{'--btn-color': '#111', width: '100%', justifyContent: 'center', padding: '1rem', fontSize: '1.25rem'}} disabled={pin.length !== 4 || !usernameInput.trim()}>
+        Confirm
+      </button>
     </div>
   );
 }
 
-// ---------------------- COMPONENTS ----------------------
 const CreateProfileForm = ({ users, onSuccess }) => {
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState('');
@@ -406,23 +465,18 @@ const CreateProfileForm = ({ users, onSuccess }) => {
   )
 }
 
-const EditProfileForm = ({ currentUser, setPinModalConfig }) => {
-  const [name, setName] = useState(currentUser.name);
-  const [avatar, setAvatar] = useState(currentUser.avatar);
+const EditProfileForm = ({ targetUser, onSuccess }) => {
+  const [name, setName] = useState(targetUser.name);
+  const [avatar, setAvatar] = useState(targetUser.avatar);
   const [newPin, setNewPin] = useState('');
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!name || !avatar) return;
-    setPinModalConfig({
-      title: 'Save Changes', subtitle: 'Enter your current PIN to confirm', targetPin: currentUser.pin,
-      onSuccess: async () => {
-        const updates = { name, avatar };
-        if (newPin.length === 4) updates.pin = hashPin(newPin);
-        await updateDoc(doc(db, 'users', currentUser.username), updates);
-        setNewPin('');
-      }
-    });
+    const updates = { name, avatar };
+    if (newPin.length === 4) updates.pin = hashPin(newPin);
+    await updateDoc(doc(db, 'users', targetUser.username), updates);
+    onSuccess();
   };
 
   return (
@@ -591,44 +645,6 @@ const WishItemModal = ({ item, currentUser, itemsCount, onClose }) => {
             </div>
             <button type="submit" className="pill-btn pill-btn-filled" style={{'--btn-color': '#111', justifyContent: 'center', marginTop: '1rem', width: '100%', fontSize: '1.25rem', padding: '1rem'}}>Save Wish</button>
          </form>
-      </div>
-    </div>
-  )
-}
-
-function PinModal({ title, subtitle, targetPin, onClose, onSuccess }) {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState(false);
-
-  const handleNum = (n) => {
-    if (pin.length < 4) {
-      const newPin = pin + n;
-      setPin(newPin);
-      if (newPin.length === 4) {
-        if (hashPin(newPin) === targetPin) {
-          onSuccess();
-        } else {
-          setError(true); setTimeout(() => { setPin(''); setError(false); }, 400);
-        }
-      }
-    }
-  };
-  
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-content" onClick={e=>e.stopPropagation()}>
-         <button onClick={onClose} style={{position: 'absolute', top: '1.5rem', right: '1.5rem', background: '#f5f5f5', width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}><X size={20}/></button>
-         <div style={{textAlign: 'center', marginBottom: '3rem'}}>
-           <h2 style={{fontSize: '2rem', fontWeight: 800, margin: '0 0 0.5rem 0', letterSpacing: '-1px'}}>{title}</h2>
-           {subtitle && <p style={{color: '#666', margin: 0, fontWeight: 500, fontSize: '1.1rem'}}>{subtitle}</p>}
-         </div>
-         <div className={`shake ${error ? 'shake' : ''}`} style={{display: 'flex', gap: '1.5rem', justifyContent: 'center', marginBottom: '3rem'}}>
-           {[...Array(4)].map((_, i) => <div key={i} className={`numpad-dot ${i < pin.length ? 'filled' : ''}`} />)}
-         </div>
-         <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', maxWidth: '320px', margin: '0 auto'}}>
-           {[1,2,3,4,5,6,7,8,9].map(n => <button key={n} className="num-key" onClick={() => handleNum(n.toString())}>{n}</button>)}
-           <div></div><button className="num-key" onClick={() => handleNum('0')}>0</button><div></div>
-         </div>
       </div>
     </div>
   )
